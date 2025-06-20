@@ -1,11 +1,10 @@
 from aiohttp import web
-from aiohttp_swagger3 import SwaggerDocs, SwaggerUiSettings
+from aiohttp_apispec import setup_aiohttp_apispec
 
-from app.routes import setup_routes
 from app.routes.auth import routes as auth_routes
 from app.routes.users import routes as user_routes
 from app.config import settings
-from app.db import engine
+from app.database.db import engine
 import logging
 
 logger = logging.getLogger(__name__)
@@ -22,17 +21,25 @@ def create_app() -> web.Application:
     app = web.Application()
     app['db'] = engine
 
-    swagger = SwaggerDocs(
-        app,
-        swagger_ui_settings=SwaggerUiSettings(path="/docs"),
+    app.add_routes(auth_routes)
+    app.add_routes(user_routes)
+
+    setup_aiohttp_apispec(
+        app=app,
         title="User API",
-        version="1.0.0"
+        version="1.0.0",
+        url="/docs/swagger.json",
+        swagger_path="/docs",
+        securityDefinitions={
+            "Bearer": {
+                "type": "apiKey",
+                "name": "Authorization",
+                "in": "header",
+                "description": "JWT токен. Пример: **Bearer eyJ0eXAi...**"
+            }
+        },
+        security=[{"Bearer": []}]
     )
-
-    swagger.add_routes(auth_routes)
-    swagger.add_routes(user_routes)
-
-    setup_routes(app)
 
     app.on_startup.append(on_startup)
     app.on_cleanup.append(on_cleanup)

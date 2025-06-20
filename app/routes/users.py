@@ -1,10 +1,13 @@
 from aiohttp import web
+from aiohttp_apispec import docs, request_schema, response_schema
 from sqlalchemy import select, insert, update, delete
-from app.models import users
-from app.db import engine
+from app.database.models import users
+from app.database.db import engine
 from app.utils.auth import decode_access_token
 from app.utils.password import hash_password
 from datetime import datetime
+
+from app.schemas.users import CreateUserSchema, UpdateUserSchema, UserResponseSchema
 
 routes = web.RouteTableDef()
 
@@ -28,6 +31,12 @@ async def get_current_user(request: web.Request):
 
 
 @routes.post("/users")
+@docs(
+    tags=["Users"],
+    summary="Создать пользователя",
+    description="Создаёт нового пользователя. Доступно только администраторам."
+)
+@request_schema(CreateUserSchema)
 async def create_user(request: web.Request):
     current_user = await get_current_user(request)
     if not current_user.is_admin:
@@ -54,16 +63,34 @@ async def create_user(request: web.Request):
 
 
 @routes.get("/users")
+@docs(
+    tags=["Users"],
+    summary="Список всех пользователей",
+    description="Возвращает список всех пользователей. Доступно всем авторизованным."
+)
+@response_schema(UserResponseSchema(many=True), 200)
 async def list_users(request: web.Request):
     current_user = await get_current_user(request)
 
     async with engine.begin() as conn:
         result = await conn.execute(select(users))
-        all_users = [dict(row._mapping) for row in result.fetchall()]
-        return web.json_response(all_users)
+        rows = result.fetchall()
+
+        all_users = [dict(row._mapping) for row in rows]
+
+        schema = UserResponseSchema(many=True)
+        serialized = schema.dump(all_users)
+
+        return web.json_response(serialized)
 
 
 @routes.get("/users/{user_id}")
+@docs(
+    tags=["Users"],
+    summary="Получить пользователя по ID",
+    description="Возвращает данные пользователя по его ID"
+)
+@response_schema(UserResponseSchema, 200)
 async def get_user(request: web.Request):
     current_user = await get_current_user(request)
     user_id = int(request.match_info["user_id"])
@@ -75,10 +102,21 @@ async def get_user(request: web.Request):
         if not user:
             raise web.HTTPNotFound(text="User not found")
 
-        return web.json_response(dict(user._mapping))
+        user_dict = dict(user._mapping)
+
+        schema = UserResponseSchema()
+        serialized = schema.dump(user_dict)
+
+        return web.json_response(serialized)
 
 
 @routes.put("/users/{user_id}")
+@docs(
+    tags=["Users"],
+    summary="Обновить пользователя",
+    description="Обновляет данные пользователя по ID. Только для админов."
+)
+@request_schema(UpdateUserSchema)
 async def update_user(request: web.Request):
     current_user = await get_current_user(request)
     if not current_user.is_admin:
@@ -106,6 +144,11 @@ async def update_user(request: web.Request):
 
 
 @routes.delete("/users/{user_id}")
+@docs(
+    tags=["Users"],
+    summary="Удалить пользователя",
+    description="Удаляет пользователя по ID. Только для администраторов."
+)
 async def delete_user(request: web.Request):
     current_user = await get_current_user(request)
     if not current_user.is_admin:

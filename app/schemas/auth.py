@@ -1,22 +1,69 @@
-from pydantic import BaseModel, EmailStr, Field
+from marshmallow import Schema, fields, validate
 
 
-class EmailSchema(BaseModel):
-    email: EmailStr
+class EmailSchema(Schema):
+    email = fields.Email(
+        required=True,
+        example="user@example.com",
+        description="Email пользователя, на который будет отправлен код подтверждения"
+    )
 
-class RegisterSchema(BaseModel):
-    email: EmailStr = Field(..., example="user@example.com")
-    password: str = Field(..., min_length=6, example="securepassword123")
-    code: str = Field(..., example="123456")
 
-class LoginSchema(BaseModel):
-    email: EmailStr
-    password: str
+class RegisterSchema(Schema):
+    email = fields.Email(
+        required=True,
+        example="user@example.com",
+        description="Email пользователя"
+    )
+    password = fields.String(
+        required=True,
+        validate=validate.Length(min=6),
+        example="securepassword123",
+        description="Пароль (минимум 6 символов)"
+    )
+    code = fields.String(
+        required=True,
+        validate=validate.Regexp(r"^\d{6}$"),
+        example="123456",
+        description="Код подтверждения из email (6 цифр)"
+    )
 
-class TokenResponse(BaseModel):
-    access_token: str
 
-class ResetPasswordSchema(BaseModel):
-    email: EmailStr
-    code: str
-    new_password: str
+class LoginSchema(Schema):
+    email = fields.Email(
+        required=True,
+        example="user@example.com",
+        description="Email, зарегистрированный в системе"
+    )
+    password = fields.String(
+        required=True,
+        example="securepassword123",
+        description="Пароль, указанный при регистрации"
+    )
+
+
+class TokenResponse(Schema):
+    access_token = fields.String(
+        required=True,
+        description="JWT access токен, используемый для авторизации"
+    )
+
+
+class ResetPasswordSchema(Schema):
+    email = fields.Email(
+        required=True,
+        example="user@example.com",
+        description="Email, на который был выслан код подтверждения"
+    )
+    code = fields.String(
+        required=True,
+        validate=validate.Regexp(r"^\d{6}$"),
+        example="123456",
+        description="Код подтверждения, полученный по почте"
+    )
+    new_password = fields.String(
+        required=True,
+        validate=validate.Length(min=6),
+        example="newSecurePass123",
+        description="Новый пароль (минимум 6 символов)"
+    )
