@@ -27,5 +27,4 @@ class UserResponseSchema(Schema):
     birth_date = fields.Date()
     is_admin = fields.Boolean()
     is_blocked = fields.Boolean()
-    created_at = fields.DateTime()
     updated_at = fields.DateTime()
