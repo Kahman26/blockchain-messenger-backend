@@ -28,12 +28,12 @@ class ConfirmEmailSchema(Schema):
 class LoginSchema(Schema):
     email = fields.Email(
         required=True,
-        example="user@example.com",
+        example="paa-gta@mail.ru",
         description="Email, зарегистрированный в системе"
     )
     password = fields.String(
         required=True,
-        example="securepassword123",
+        example="new123456",
         description="Пароль, указанный при регистрации"
     )
 

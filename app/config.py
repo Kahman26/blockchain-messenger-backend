@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings
-
+from pathlib import Path
 
 class Settings(BaseSettings):
     PORT: int
@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     EMAIL_HOST_PASSWORD: str
 
     class Config:
-        env_file = ".env"
+        env_file = str(Path(__file__).parent / ".env")
         env_file_encoding = "utf-8"
 
 settings = Settings()

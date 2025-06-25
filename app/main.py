@@ -3,6 +3,8 @@ from aiohttp_apispec import setup_aiohttp_apispec
 
 from app.routes.auth import routes as auth_routes
 from app.routes.users import routes as user_routes
+from app.routes.messages import routes as message_routes
+
 from app.config import settings
 from app.database.db import engine
 import logging
@@ -23,6 +25,7 @@ def create_app() -> web.Application:
 
     app.add_routes(auth_routes)
     app.add_routes(user_routes)
+    app.add_routes(message_routes)
 
     setup_aiohttp_apispec(
         app=app,
@@ -36,9 +39,18 @@ def create_app() -> web.Application:
                 "name": "Authorization",
                 "in": "header",
                 "description": "JWT токен. Пример: **Bearer eyJ0eXAi...**"
+            },
+            "PrivateKey": {
+                "type": "apiKey",
+                "name": "X-Private-Key",
+                "in": "header",
+                "description": "PEM-ключ в виде строки (начинается с -----BEGIN PRIVATE KEY-----)"
             }
         },
-        security=[{"Bearer": []}]
+        security=[
+            {"Bearer": []},
+            {"PrivateKey": []}
+        ]
     )
 
     app.on_startup.append(on_startup)
