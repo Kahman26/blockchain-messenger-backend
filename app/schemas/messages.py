@@ -21,3 +21,20 @@ class InboxMessageSchema(Schema):
 
 class InboxResponseSchema(Schema):
     messages = fields.List(fields.Nested(InboxMessageSchema))
+
+
+class EncryptedPerUserSchema(Schema):
+    receiver_id = fields.Int(required=True)
+    encrypted_message = fields.String(required=True)
+    signature = fields.String(required=True)
+
+
+class EncryptedBroadcastListSchema(Schema):
+    __schema_type__ = "array"
+    __schema_items__ = fields.Nested(EncryptedPerUserSchema)
+
+
+class ChatMessageSchema(Schema):
+    from_user_id = fields.Int(required=True, description="ID отправителя")
+    message = fields.String(required=True, description="Расшифрованное сообщение")
+    timestamp = fields.String(required=True, description="Дата и время отправки")

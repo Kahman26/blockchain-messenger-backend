@@ -60,13 +60,6 @@ Roles = Table(
     CheckConstraint("role_name IN ('owner', 'admin', 'moderator', 'muted')")
 )
 
-Attachments = Table(
-    "Attachments", metadata,
-    Column("attachment_id", BigInteger, primary_key=True, autoincrement=True),
-    Column("message_id", BigInteger, ForeignKey("Messages.message_id"), nullable=False),
-    Column("file_path", String(255), nullable=False),
-    Column("file_type", String(20), nullable=False),
-)
 
 Users = Table(
     "Users", metadata,
@@ -98,15 +91,6 @@ Admins = Table(
     Column("notes", Text),
 )
 
-Messages = Table(
-    "Messages", metadata,
-    Column("message_id", BigInteger, primary_key=True, autoincrement=True),
-    Column("chat_id", BigInteger, ForeignKey("Chats.chat_id"), nullable=False),
-    Column("user_id", Integer, ForeignKey("Users.user_id"), nullable=False),
-    Column("message_content", Text, nullable=False),
-    Column("sent_at", DateTime, nullable=False, server_default=func.now()),
-    Column("edited_at", DateTime, onupdate=func.now()),
-)
 
 ChatMembers = Table(
     "ChatMembers", metadata,
@@ -157,6 +141,7 @@ BlockchainTransactions = Table(
     Column("block_id", Integer, ForeignKey("BlockchainBlocks.block_id", ondelete="CASCADE"), nullable=False),
     Column("sender_id", Integer, ForeignKey("Users.user_id"), nullable=False),
     Column("receiver_id", Integer, ForeignKey("Users.user_id"), nullable=False),
+    Column("chat_id", BigInteger, ForeignKey("Chats.chat_id"), nullable=True),  # <--- НОВОЕ
     Column("payload_hash", CHAR(64), nullable=False),
     Column("signature", Text, nullable=False),
     Column("timestamp", DateTime, nullable=False, server_default=func.now()),
@@ -173,5 +158,19 @@ UserKeys = Table(
     "UserKeys", metadata,
     Column("user_id", Integer, ForeignKey("Users.user_id"), primary_key=True),
     Column("public_key", Text, nullable=False),
+    Column("created_at", DateTime, nullable=False, server_default=func.now()),
+)
+
+BlockchainFiles = Table(
+    "BlockchainFiles", metadata,
+    Column("file_id", BigInteger, primary_key=True, autoincrement=True),
+    Column("transaction_id", BigInteger, ForeignKey("BlockchainTransactions.transaction_id", ondelete="CASCADE"), nullable=False),
+    Column("file_name", String(255), nullable=False),
+    Column("mime_type", String(100), nullable=False),
+    Column("file_url", Text, nullable=False),  # ссылка на зашифрованный файл в хранилище
+    Column("file_size", BigInteger, nullable=False),  # размер в байтах
+    Column("encrypted_key", Text, nullable=False),  # AES-ключ, зашифрованный публичным ключом получателя
+    Column("file_hash", String(64), nullable=False),  # SHA256 хеш исходного файла
+    Column("thumbnail_base64", Text),  # превью (опционально, например, для изображений)
     Column("created_at", DateTime, nullable=False, server_default=func.now()),
 )

@@ -28,13 +28,14 @@ async def create_block(prev_hash: str, nonce: int, creator_user_id: int):
         block_id = result.inserted_primary_key[0]
     return block_id, block_hash
 
-async def add_transaction(block_id: int, sender_id: int, receiver_id: int, payload_hash: str, signature: str):
+async def add_transaction(block_id: int, sender_id: int, receiver_id: int, chat_id: int, payload_hash: str, signature: str):
     async with engine.begin() as conn:
         result = await conn.execute(
             insert(BlockchainTransactions).values(
                 block_id=block_id,
                 sender_id=sender_id,
                 receiver_id=receiver_id,
+                chat_id=chat_id,
                 payload_hash=payload_hash,
                 signature=signature,
                 timestamp=datetime.utcnow(),
