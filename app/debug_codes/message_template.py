@@ -31,37 +31,37 @@ async def generate_message_template(sender_id: int, receiver_ids: list[int], mes
 
 
 if __name__ == "__main__":
-    sender_id = 8
-    receiver_ids = [2]
-    message = "Это сообщение от 8 к 2 id"
+    sender_id = 2
+    receiver_ids = [8, sender_id]
+    message = "Это еще одно сообщение от 2 к себе и 8 id в личном чате "
 
     sender_priv_key = """-----BEGIN PRIVATE KEY-----
-MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCdogQRx5DiN5cd
-R4s48WbpJk+5Oe9AugRBjPIDynDYC3gjDhoAarZvZsEgJlBPK25Pl8WlIDnaKnOc
-0W7Qm5QZR9lRQw7tfsxKijJ/5lbAupbK5F+RmgxxWi6FDMZ5GomHsq8B827TnOCX
-5/AFl44qyhM3fF1nncHVRs93nrsx2x6pEwQNQdsExsH/TGkk0R6U5p8B15ZJ3M7P
-KQcBpknbzfGDsMV+HbhuBy2LMzFHKFGY3ZZc4aBVFIGYpn0/niCgUaHJNJTMc7YC
-AhB2O6cbdThUgXJREq9Fy8uuucvuFPriQie2/OYqw4OS6mbaQDZ4EqT4wVruymVI
-zY/rTAeHAgMBAAECggEAGiPNq0nInQ2H5HtCkJOjiQKT54zpFSGOZsph2xQSiMPE
-zSy0+MsOwW7XlCZrsefrV+KSDB3Jyi5jqVEnoGCe+17pSur6X5Lj0MaVtOpJtOsc
-P2gF8HC3Iy2dF5jfPsznmpZHJDqDRISNeqij1Qw6r0jUTU1fyzjOIGPThVbQBxEN
-l1vPsqJU0h+8D0RiDVaqp8dTlxMXCVhlDm2p150NVPQWkeT4KRIaP0/JWoDNvpiJ
-VLYtpU0+qr7ZDZdl1e7/ahO2tD8Lc3bBR53Ow3Jgg8iKu4V1s4UG2n0tMM+bSwtF
-TA4SI9E8q+4oBmWcmeodmujCNau0zJguEYCQ5nkeTQKBgQDRmjqu4ragFecDeyL2
-hIORwXifCXRlivxeRTmjGd7ZotwoM7BOJe7EfP6U/g3//5ry6tRTduJR6KPyDKkx
-CDBri5kKOA3sScCvDl8RNbpXpEbr0844T6H1S1vNIBKTIC5rD9yTB/HSQfHLgBlE
-2GeMeZVWvN+Q1HNi40BiTT7FHQKBgQDAhsUKCFAQKi2ggZV6jCdXwo9tuAZk0jCs
-Pbkgi4yK3CUA/qqzy6G+jvFUqSg/uLcdxSDiHLtOODxhsm3+fIuIUsCLGV45vUoW
-oI2ymXfMeN8hqkR+XGlFKDWje68PQJiUjocmqFAqxDCtYMB4mvsqNx/ofYyv6eDa
-kkbZ0iAR8wKBgBAc2RIEn6FizaV429EzkqGry8f+BBKiQpBEpg+ht33nhSEaCB2Z
-0OcN7MwrU4wwbArsfnIEG5XMWn4K9x6r0H0T+CnO8VMOwF80rZ43ESIXoNQULjAp
-/vtKVb5JDuR8ftUAHSa4X6CYLSxFpquiLyOfXRmT32PU0SHy8kocQg0JAoGAPqJZ
-rhbgPTILoAEoaTL5hbKVSOOqqNg833xBIxZjRbWzECzJyi6AU2dbmehiYMCuSjAc
-r5MbWKow8rPC1x0bo+EQJPC+19f+J3haQPVupQXZybEEEXvs/4PCV4pgfHzOZt4r
-l+cAFbm4AF/Oni4Fckl2xwM5Zu2WqmUWSbzzlAMCgYAbZ9gHVQSwdjF7vRGScRu9
-B6pcDfgPBiq1xzVu2rV0Hv49u8z6gtGTe/alpgQcnXIja2eMyrgwbSA7J9VusLhi
-NiLHcXoEm5ZhXsjgJtAlIqMVLk3J2olWJDhUldZrx9ju0xUSXmZSdKJhv/sC3Jy1
-197mr0SkTveqRU/UO5HluA==
+MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQC4yp6s+jUhuZw0
+kFMu3OGmB2C950Nzz9YU5tDWqRr4YAtjq2JiDk5kIjtMfni2O/s/6wdm5gup9DEi
+1YyzELoUzPC7q+urEFXmzurSH1wzMPFRXQ1J5l8l3/qM0O+2dLOqIIRrOstP9OY2
+NA2swQrXbFTbQyvm75M16lh1ZxghzJE5ER/Gf8tKtNfLJ2Ea0fUw4RgrvYIO9po/
+Tzs9pu0+jE8U+SzqRDlJ8aQh/4DzUguGS/ZxrJsRtPc2vozyky7eWV+2GklbDKoq
+zHDAjGcYE57VGVwI1Dt+eoGEs1MuXF/Bm88Qr6MzH2inw9TqmpFYD7g7x9bfSdFk
+AvrXSsdJAgMBAAECggEAKPCfAfS3A79C97RH8Zh3F5kH2lrbq1NO+zd96ijx9DgX
+HeBQ/idsP6wD1jko1jrouasA60+pIuCaaDzGnL9mcohLB1EZ9765QVbzWFUhUKgV
+trB2arpytwnt0PfTO+mUCmuE2treQ1sfC8AxjWYBWGPEUwWJOvM1+ppuOah7BLWU
+zHrGrUrrfFQQmkEoYkehJ/hr1XmRTGJTCKuAhD+DTVFzbeJ32n2oRh8jH9nWcMY7
+bxf3qLf0Ezz7tVzswTgJBDo/6KRQBU2mwNaTuFcYq7wu4oy/DHWQQ5qZN+uFvXqS
+xxgT2fFCV0AKrGdZA3m5D3EW6IerWD6ECgDEBUQjVwKBgQDdv58R/gIU4wSugagy
+X1i4GW9+sZGe6iCQhxtyalv0lsqaHpUWZwpb8AEfBoAMcemLz75oSnQ4IT0Zy2j7
+ZFjMrjtTVAiagJQGRmGXo98VimAEePMaU5U2Ef3b+SF2Pn9q5IgJ3V/SB7tIWHu+
+O20Le0/WKHPXW2bxb4ELXn3a5wKBgQDVVaS91QQ6Eok9tR+b2IDo0fu10BUchr3O
+EolUO6Bi03yvJaChU2jJPx1lgNOYmpv85kh2QmEpsgZ+3U06ENP3kN2GDQdUms9Q
+wpXpcvN00cU5Nx79o1tpp9q9dkIGY3VQcn9iiNBIoZy0+Gb2d0XqV1IhQXfhXe2b
+fed3Pgy2TwKBgGNyP1VjU+2oDf5w2UyV5ATUK2NnIQZiu231mYKLXmfnhD7v/i6I
+0WV/0hDm6mAqafGwnhTJZyuRBITf61nqm8RXUvXA1wbrKPdTcwr9i9tuLjdzQpsI
+5v7TvMR9CturlZsLmFLMO9/GZeBBBmW+4t1mVNyXUbRAIn+eYQIHQ2v7AoGAaFQT
+1so/4O6Ds2vKY3rDwBhA0q9KQ8MZO5gRFOJ8Exh+F2F9ZqfVzOVSyPrxf+XMdydf
+NIZN4ggv6Qbs54KnRqDP1Oi2NwfmbwZaLeqLaQvVOZ/dRgkHgWoXLSSSMXGeQ5Na
+/KMPyRVP/6ijIdE+ndXKUn0j1VEMDEjMU6JCsT0CgYBk/R+UCenDjRRu8tnvzAB6
+pnsxVzJ40+wAkX9/MGIcq4I7fJ7T2nCVlmBx4mFzXMVZ0l+Rrp8nO5KS9VlHoB4c
+v4ZlxoUvGrcdrtbp98eI4dimbdiKtD6BadaQ+RqpKxtAb8uLFIYkThAAOOccRYiF
+/fkmB+dcDxC924MPKArzxQ==
 -----END PRIVATE KEY-----"""
 
     try:
@@ -80,13 +80,13 @@ swagger = \
 [
   {
     "receiver_id": 8,
-    "encrypted_message": "mY27dkHn4FOjoi0p...==",
-    "signature": "X5pvcuwB9siBhg5sKZtW+...=="
+    "encrypted_message": "QdcgzFhN0/hiWE/xQIvgtN25gbTVSmV5hZUiDpj0AOoJUh40KSV75uvZ0AP24TlMCC3DiR5MHPtnXEt3WRJOzBpMOGC0Z/yLT3Tzq25G38ZFl2UzdupPm6Xo/sY68HFg0qFCWt+o6UkDEsDAfNrOl6sPQTSjXvxYD1zK5v8HCczuRkF7qPw7sMZLY745yzUcSZRXOxzquE6xDmiypRycRmK9QsW8xykPqD64T9JnQAL2MZiZi+XjiHpR9kpelVNam2jfWjQUrKU0fu/J1xuCoR4LwQAWTzDGvX1j3FYnGMxzgDOxtOYHFAkdSN+J8tsWU5JHdTS4p11msFv2FeeFwA==",
+    "signature": "oHYXWdC6i33rMT63cmw2GF9lFdF9RQxuDugzq+31rG0a36r4jgqeOzBzzHk14ghDPMFnTC8wLX8tIktlNXv+b7Pe9PUJTYwdbNlIy7/RLGMWvS0UG4W4UqdJaJAPAE0/jNuzhWUKvls/RJPL3ZOnzXguffQY4ADmH2u/CeiaaY5gOGTSMfyAzjbMc2h91dYl7KPBq8UdskCTqwH/Hbvib5UweCKD/OQTU5qT1TP8E//uw8lvvI/AHCT2Dn8BCKKGcxPsPAURgtIeVh0oRdwwWXNUq0iB4KBChHSYp44GoxXTTi94wyKkd/Z0ckCgEDmhG/1F4nZyJQZwri/dj/D6ig=="
   },
   {
-    "receiver_id": 9,
-    "encrypted_message": "Qlhfd0h4OG84SnAxZ...==",
-    "signature": "X5pvcuwB9siBhg5sKZtW+...=="
+    "receiver_id": 2,
+    "encrypted_message": "Aujx+GxoARlS1mLgp32PFNkjQbTk0xn66DW03C5BnJzzNQQLYJvh21w0pQmriOXbgk6BA/rFCOwSrcVOJ4iqZT7sCxNPim8tu7Q7HeWcK5Qo8wd60AroSYJtGyoiSWFAYuXgfG2+t47nL0+KDm+dbsbbnTN3atdtw1UJRYSnRDuqmbPoUUBHaX3jtLR/ZGBibiM1Dw+EUQT/oxajuDGjeNf1Kb3KNP6huvhEkBC5aJVo+fpJJZyHCsz8MwLoEe6Hu/ExaR3jzWx6ACBQMdED5Zp/DHIZN5SUdcXg/sRiiI+epNJxpR4bV4+RoXnDCRU1am9yaneuzwQhh5/OqSfgrA==",
+    "signature": "oHYXWdC6i33rMT63cmw2GF9lFdF9RQxuDugzq+31rG0a36r4jgqeOzBzzHk14ghDPMFnTC8wLX8tIktlNXv+b7Pe9PUJTYwdbNlIy7/RLGMWvS0UG4W4UqdJaJAPAE0/jNuzhWUKvls/RJPL3ZOnzXguffQY4ADmH2u/CeiaaY5gOGTSMfyAzjbMc2h91dYl7KPBq8UdskCTqwH/Hbvib5UweCKD/OQTU5qT1TP8E//uw8lvvI/AHCT2Dn8BCKKGcxPsPAURgtIeVh0oRdwwWXNUq0iB4KBChHSYp44GoxXTTi94wyKkd/Z0ckCgEDmhG/1F4nZyJQZwri/dj/D6ig=="
   }
 ]
 

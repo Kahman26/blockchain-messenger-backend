@@ -3,7 +3,6 @@ from aiohttp_apispec import setup_aiohttp_apispec
 
 from app.routes.auth import routes as auth_routes
 from app.routes.users import routes as user_routes
-from app.routes.messages import routes as message_routes
 from app.routes.chats import setup_chat_routes
 
 from app.config import settings
@@ -26,7 +25,6 @@ def create_app() -> web.Application:
 
     app.add_routes(auth_routes)
     app.add_routes(user_routes)
-    app.add_routes(message_routes)
     setup_chat_routes(app)
 
     setup_aiohttp_apispec(

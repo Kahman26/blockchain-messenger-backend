@@ -114,7 +114,7 @@ async def get_chat_info(request: web.Request):
     schema = ChatResponseSchema()
     return web.json_response(schema.dump(dict(chat._mapping)))
 
-@docs(tags=["chats"], summary="Добавить участника в чат (только group и channel)")
+@docs(tags=["chats"], summary="Добавить участника в чат (group, channel, или второй участник private-чата)")
 @request_schema(ChatAddMemberSchema)
 async def add_chat_member(request: web.Request):
     jwt_payload = get_jwt_payload(request)
@@ -124,35 +124,36 @@ async def add_chat_member(request: web.Request):
     new_user_id = data["user_id"]
 
     async with engine.begin() as conn:
-        # Получаем информацию о чате
+        # Получаем тип чата
         result = await conn.execute(
             select(Chats.c.chat_type).where(Chats.c.chat_id == chat_id)
         )
         chat = result.fetchone()
         if not chat:
             raise web.HTTPNotFound(reason="Чат не найден")
-        if chat.chat_type == "private":
-            raise web.HTTPBadRequest(reason="Нельзя добавлять участников в личный чат")
 
-        # Проверка: является ли requester участником чата
         result = await conn.execute(
             select(ChatMembers).where(
-                (ChatMembers.c.chat_id == chat_id) & (ChatMembers.c.user_id == requester_id)
+                (ChatMembers.c.chat_id == chat_id) &
+                (ChatMembers.c.user_id == requester_id)
             )
         )
         if not result.first():
             raise web.HTTPForbidden(reason="Вы не участник этого чата")
 
-        # Проверка: уже есть участник или нет
         result = await conn.execute(
-            select(ChatMembers).where(
-                (ChatMembers.c.chat_id == chat_id) & (ChatMembers.c.user_id == new_user_id)
-            )
+            select(ChatMembers.c.user_id).where(ChatMembers.c.chat_id == chat_id)
         )
-        if result.first():
+        existing_members = {row.user_id for row in result.fetchall()}
+
+        if new_user_id in existing_members:
             raise web.HTTPConflict(reason="Пользователь уже в чате")
 
-        # Добавляем
+        if chat.chat_type == "private":
+            if len(existing_members) >= 2:
+                raise web.HTTPBadRequest(reason="В личном чате не может быть больше двух участников")
+
+        # Добавляем нового участника
         await conn.execute(
             insert(ChatMembers).values(
                 chat_id=chat_id,
@@ -197,8 +198,8 @@ async def remove_chat_member(request: web.Request):
 
 @docs(
     tags=["Messages"],
-    summary="Отправка индивидуально зашифрованных сообщений участникам чата",
-    description="Каждому участнику отправляется своя копия зашифрованного сообщения",
+    summary="Отправка индивидуально зашифрованных сообщений участникам чата (включая себя)",
+    description="Каждому участнику (включая себя) отправляется своя копия зашифрованного сообщения"
 )
 @request_schema(EncryptedBroadcastListSchema)
 async def send_chat_message(request: web.Request):
@@ -209,12 +210,10 @@ async def send_chat_message(request: web.Request):
     if not isinstance(messages, list) or not messages:
         raise web.HTTPBadRequest(text="Ожидается массив сообщений")
 
-    # Получаем участников чата (без отправителя)
     async with engine.connect() as conn:
         result = await conn.execute(
             select(ChatMembers.c.user_id)
             .where(ChatMembers.c.chat_id == chat_id)
-            .where(ChatMembers.c.user_id != sender_id)
         )
         valid_receivers = {row.user_id for row in result.fetchall()}
 
@@ -231,7 +230,7 @@ async def send_chat_message(request: web.Request):
         signature = msg["signature"]
 
         if receiver_id not in valid_receivers:
-            continue  # игнорируем не участников
+            continue
 
         tx_id = await db_chain.add_transaction(
             block_id=block_id,
@@ -252,20 +251,16 @@ async def send_chat_message(request: web.Request):
 
 @docs(
     tags=["Messages"],
-    summary="Получить сообщения чата",
-    description="Показывает только сообщения, адресованные вам в данном чате",
+    summary="Получить все сообщения чата (зашифрованные)",
+    description="По одному сообщению из каждого блока, показывает зашифрованные данные"
 )
 @response_schema(ChatMessageSchema(many=True), 200)
 async def get_chat_messages(request: web.Request):
     user_id = await get_current_user_id(request)
     chat_id = int(request.match_info["chat_id"])
-    priv_key = request.headers.get("X-Private-Key")
-
-    if not priv_key:
-        raise web.HTTPBadRequest(text="Укажите заголовок X-Private-Key")
 
     async with engine.connect() as conn:
-        # Проверка: пользователь состоит в чате
+        # Проверка участия в чате
         result = await conn.execute(
             select(ChatMembers).where(
                 (ChatMembers.c.chat_id == chat_id) &
@@ -275,36 +270,46 @@ async def get_chat_messages(request: web.Request):
         if not result.fetchone():
             raise web.HTTPForbidden(text="Вы не состоите в этом чате")
 
-        # Получаем транзакции в этом чате, адресованные текущему пользователю
+        # Получаем все транзакции, где участвует пользователь
         tx_result = await conn.execute(
-            select(BlockchainTransactions).where(
+            select(BlockchainTransactions)
+            .where(
                 (BlockchainTransactions.c.chat_id == chat_id) &
-                (BlockchainTransactions.c.receiver_id == user_id)
-            ).order_by(BlockchainTransactions.c.timestamp.asc())
+                (
+                    (BlockchainTransactions.c.receiver_id == user_id) |
+                    (BlockchainTransactions.c.sender_id == user_id)
+                )
+            )
+            .order_by(BlockchainTransactions.c.timestamp.asc())
         )
-        transactions = tx_result.fetchall()
+        all_transactions = tx_result.fetchall()
+
+        # Группируем по block_id
+        from collections import defaultdict
+        block_map = defaultdict(list)
+        for tx in all_transactions:
+            block_map[tx.block_id].append(tx)
 
         messages = []
 
-        for tx in transactions:
+        for block_id, tx_list in block_map.items():
+            # Сначала пытаемся найти именно входящую для текущего пользователя
+            preferred_tx = next((tx for tx in tx_list if tx.receiver_id == user_id), tx_list[0])
+
             payload_result = await conn.execute(
                 select(BlockchainPayloads).where(
-                    BlockchainPayloads.c.transaction_id == tx.transaction_id
+                    BlockchainPayloads.c.transaction_id == preferred_tx.transaction_id
                 )
             )
             payload = payload_result.fetchone()
             if not payload:
                 continue
 
-            try:
-                decrypted = decrypt_message(payload.encrypted_data, priv_key)
-            except Exception:
-                decrypted = "[Ошибка расшифровки]"
-
+            # ❗ Возвращаем зашифрованное сообщение, без расшифровки
             messages.append({
-                "from_user_id": tx.sender_id,
-                "message": decrypted,
-                "timestamp": tx.timestamp.isoformat()
+                "from_user_id": preferred_tx.sender_id,
+                "message": payload.encrypted_data,
+                "timestamp": preferred_tx.timestamp.isoformat()
             })
 
     return web.json_response(messages)
