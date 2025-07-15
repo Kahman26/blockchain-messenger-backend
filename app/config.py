@@ -8,6 +8,12 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     JWT_EXP_SECONDS: int = 3600
 
+    POSTGRES_USER: str
+    POSTGRES_PASSWORD: str
+    POSTGRES_DB: str
+    POSTGRES_HOST: str
+    POSTGRES_PORT: int
+
     EMAIL_HOST: str
     EMAIL_PORT: int
     EMAIL_HOST_USER: str

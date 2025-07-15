@@ -33,7 +33,7 @@ class LoginSchema(Schema):
     )
     password = fields.String(
         required=True,
-        example="new123456",
+        example="123456",
         description="Пароль, указанный при регистрации"
     )
 
