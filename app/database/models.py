@@ -72,6 +72,7 @@ Users = Table(
     Column("password_hash", String(128), nullable=False),
     Column("birth_date", Date, nullable=False),
     Column("last_seen", DateTime, nullable=False, server_default=func.now(), onupdate=func.now()),
+    Column("is_activated_acc", Boolean, default=False),
 )
 
 Email_verifications = Table(

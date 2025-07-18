@@ -1,6 +1,6 @@
 from aiohttp import web
 from aiohttp_apispec import docs, request_schema, response_schema
-from sqlalchemy import select, insert
+from sqlalchemy import select, insert, func
 from app.database.db import engine
 from app.database.models import Chats, ChatMembers, ChatUserRoles, BlockchainTransactions, BlockchainPayloads
 from app.utils.auth import get_jwt_payload, decode_access_token
@@ -74,7 +74,7 @@ async def create_chat(request: web.Request):
     return web.json_response({"chat_id": chat_id}, status=201)
 
 
-@docs(tags=["chats"], summary="Получить список чатов текущего пользователя")
+@docs(tags=["chats"], summary="Получить список чатов текущего пользователя с датой последнего сообщения")
 @response_schema(ChatListSchema, 200)
 async def get_user_chats(request: web.Request):
     jwt_payload = get_jwt_payload(request)
@@ -82,11 +82,25 @@ async def get_user_chats(request: web.Request):
 
     async with engine.connect() as conn:
         result = await conn.execute(
-            select(Chats)
-            .join(ChatMembers, Chats.c.chat_id == ChatMembers.c.chat_id)
+            select(
+                Chats,
+                func.max(BlockchainTransactions.c.timestamp).label("last_message_time")
+            )
+            .select_from(
+                Chats
+                .join(ChatMembers, Chats.c.chat_id == ChatMembers.c.chat_id)
+                .outerjoin(BlockchainTransactions, Chats.c.chat_id == BlockchainTransactions.c.chat_id)
+            )
             .where(ChatMembers.c.user_id == user_id)
+            .group_by(Chats.c.chat_id)
+            .order_by(func.max(BlockchainTransactions.c.timestamp).desc())
         )
-        chats = [dict(row._mapping) for row in result.fetchall()]
+
+        chats = []
+        for row in result.fetchall():
+            chat_data = {col.name: row._mapping[col.name] for col in Chats.c}
+            chat_data["last_message_time"] = row._mapping["last_message_time"]
+            chats.append(chat_data)
 
     schema = ChatListSchema()
     return web.json_response(schema.dump({"chats": chats}))
@@ -113,6 +127,7 @@ async def get_chat_info(request: web.Request):
 
     schema = ChatResponseSchema()
     return web.json_response(schema.dump(dict(chat._mapping)))
+
 
 @docs(tags=["chats"], summary="Добавить участника в чат (group, channel, или второй участник private-чата)")
 @request_schema(ChatAddMemberSchema)

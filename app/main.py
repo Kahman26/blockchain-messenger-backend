@@ -1,4 +1,5 @@
 from aiohttp import web
+import aiohttp_cors
 from aiohttp_apispec import setup_aiohttp_apispec
 
 from app.routes.auth import routes as auth_routes
@@ -23,8 +24,12 @@ def create_app() -> web.Application:
     app = web.Application()
     app['db'] = engine
 
-    app.add_routes(auth_routes)
-    app.add_routes(user_routes)
+    for route in auth_routes:
+        app.router.add_route(route.method, route.path, route.handler)
+
+    for route in user_routes:
+        app.router.add_route(route.method, route.path, route.handler)
+
     setup_chat_routes(app)
 
     setup_aiohttp_apispec(
@@ -53,11 +58,24 @@ def create_app() -> web.Application:
         ]
     )
 
+    cors = aiohttp_cors.setup(app, defaults={
+        "*": aiohttp_cors.ResourceOptions(
+            allow_credentials=True,
+            expose_headers="*",
+            allow_headers="*",
+            allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        )
+    })
+
+    for route in list(app.router.routes()):
+        cors.add(route)
+
     app.on_startup.append(on_startup)
     app.on_cleanup.append(on_cleanup)
 
     return app
 
+
 if __name__ == '__main__':
     app = create_app()
-    web.run_app(app, port=settings.PORT)
+    web.run_app(app, host='0.0.0.0', port=settings.PORT)

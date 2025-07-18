@@ -13,6 +13,9 @@ class RegisterSchema(Schema):
         example="securepassword123",
         description="Пароль (минимум 6 символов)"
     )
+    username = fields.String(required=True)
+    phone_number = fields.String(required=True)
+    public_key = fields.String(required=True)
 
 
 class ConfirmEmailSchema(Schema):

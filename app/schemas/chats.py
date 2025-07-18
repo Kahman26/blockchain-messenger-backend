@@ -14,6 +14,7 @@ class ChatResponseSchema(Schema):
     creator_user_id = fields.Int()
     description = fields.Str()
     created_at = fields.DateTime()
+    last_message_time = fields.DateTime(allow_none=True)
 
 
 class ChatListSchema(Schema):

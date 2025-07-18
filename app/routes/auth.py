@@ -17,22 +17,47 @@ routes = web.RouteTableDef()
 @request_schema(RegisterSchema)
 async def register(request: web.Request):
     data = await request.json()
-    email = data.get("email")
-    password = data.get("password")
+    email = data["email"]
+    password = data["password"]
+    username = data["username"]
+    phone_number = data["phone_number"]
+    public_key = data["public_key"]
 
-    if not all([email, password]):
-        return web.json_response({"error": "Email and password required"}, status=400)
+    if not all([email, password, username, phone_number, public_key]):
+        return web.json_response({"error": "Missing fields"}, status=400)
 
-    if await db_auth.get_user_by_email(email):
-        return web.json_response({"error": "User already exists"}, status=400)
-
-    hashed = hash_password(password)
-    user_id = await db_auth.insert_user(email, hashed)
-
-    code = f"{random.randint(100000, 999999)}"
+    user = await db_auth.get_user_by_email(email)
     now = datetime.utcnow()
+    code = f"{random.randint(100000, 999999)}"
 
-    await db_auth.create_verification_code(user_id=user_id, code=code, now=now)
+    if user:
+        if user.is_activated_acc:
+            return web.json_response({"error": "Email already registered"}, status=400)
+        else:
+            # повторная отправка кода
+            await db_auth.update_verification_code(email, code, now)
+            try:
+                send_verification_email(email_to=email, code=code)
+            except Exception as e:
+                return web.json_response({"error": f"Failed to send email: {str(e)}"}, status=500)
+
+            return web.json_response({"message": "Account not confirmed. Verification code sent again."})
+
+    if await db_auth.user_exists_by_username(username):
+        return web.json_response({"error": "Username already taken"}, status=400)
+
+    # регистрация нового пользователя
+    hashed = hash_password(password)
+
+    user_id = await db_auth.insert_user(
+        username=username,
+        phone_number=phone_number,
+        email=email,
+        password_hash=hashed,
+    )
+
+    await db_auth.save_public_key(user_id, public_key)
+    await db_auth.create_verification_code(user_id, code, now)
 
     try:
         send_verification_email(email_to=email, code=code)
@@ -61,6 +86,8 @@ async def confirm_email(request: web.Request):
     if (datetime.utcnow() - verification.updated_at).total_seconds() > 600:
         return web.json_response({"error": "Code expired"}, status=400)
 
+    await db_auth.activate_user_account(user.user_id)
+
     return web.json_response({"message": "Email confirmed"})
 
 
@@ -76,6 +103,10 @@ async def login(request: web.Request):
     user = await db_auth.get_user_by_email(email)
     if not user or not verify_password(password, user.password_hash):
         return web.json_response({"error": "Invalid credentials"}, status=401)
+
+    if not user.is_activated_acc:
+        return web.json_response({"error": "Account not activated"}, status=403)
+
     # будет переделано:
     # if user.is_blocked:
     #     return web.json_response({"error": "User is blocked"}, status=403)
