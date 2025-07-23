@@ -116,7 +116,10 @@ async def login(request: web.Request):
         "email": user.email,
     })
 
-    return web.json_response({"access_token": token})
+    return web.json_response({
+        "user_id": user.user_id,
+        "access_token": token,
+    })
 
 
 @routes.post('/auth/request-verification')

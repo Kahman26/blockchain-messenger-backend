@@ -4,11 +4,13 @@ from app.config import settings
 from typing import Optional
 from aiohttp import web
 
+
 def create_access_token(data: dict, expires_delta: Optional[int] = None) -> str:
     to_encode = data.copy()
     expire = datetime.utcnow() + timedelta(seconds=expires_delta or settings.JWT_EXP_SECONDS)
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
+
 
 def decode_access_token(token: str) -> dict:
     try:
