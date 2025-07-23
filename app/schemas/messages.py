@@ -35,6 +35,13 @@ class EncryptedBroadcastListSchema(Schema):
 
 
 class ChatMessageSchema(Schema):
+    message_id = fields.Int(required=True, description="ID транзакции (сообщения)")
     from_user_id = fields.Int(required=True, description="ID отправителя")
-    message = fields.String(required=True, description="Расшифрованное сообщение")
+    from_username = fields.Str(required=True, description="Имя пользователя отправителя")
+    encrypted_data = fields.String(required=True, description="Зашифрованное сообщение (base64)")
+    signature = fields.String(required=True, description="Подпись сообщения (base64)")
     timestamp = fields.String(required=True, description="Дата и время отправки")
+
+
+class ChatMessageListSchema(Schema):
+    messages = fields.List(fields.Nested(ChatMessageSchema), required=True)

@@ -3,7 +3,7 @@ import aiohttp_cors
 from aiohttp_apispec import setup_aiohttp_apispec
 
 from app.routes.auth import routes as auth_routes
-from app.routes.users import routes as user_routes
+from app.routes.users import setup_user_routes
 from app.routes.chats import setup_chat_routes
 
 from app.config import settings
@@ -12,11 +12,14 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 async def on_startup(app: web.Application):
     logger.info("Starting up...")
 
+
 async def on_cleanup(app: web.Application):
     logger.info("Cleaning up...")
+
 
 def create_app() -> web.Application:
     logging.basicConfig(level=logging.INFO)
@@ -27,8 +30,7 @@ def create_app() -> web.Application:
     for route in auth_routes:
         app.router.add_route(route.method, route.path, route.handler)
 
-    for route in user_routes:
-        app.router.add_route(route.method, route.path, route.handler)
+    setup_user_routes(app)
 
     setup_chat_routes(app)
 

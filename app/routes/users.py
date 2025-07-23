@@ -4,11 +4,16 @@ from datetime import datetime
 
 from app.database import users as db_users
 
-from app.utils.auth import decode_access_token
+from app.utils.auth import get_jwt_payload, decode_access_token
 from app.utils.password import hash_password
 from app.utils.locks import get_user_lock
 
-from app.schemas.users import CreateUserSchema, UpdateUserSchema, UserResponseSchema
+from app.schemas.users import CreateUserSchema, UpdateUserSchema, UserResponseSchema, UserLastSeenSchema
+
+# потом убрать и сделать отдельный файл с бд
+from sqlalchemy import select, insert, func
+from app.database.db import engine
+from app.database.models import Users
 
 routes = web.RouteTableDef()
 
@@ -148,3 +153,40 @@ async def delete_user(request: web.Request):
         await db_users.delete_user(user_id)
 
     return web.json_response({"message": "User deleted"})
+
+
+@routes.get("/users/{user_id}/last-seen", allow_head=False)
+@docs(
+    tags=["Users"],
+    summary="Получить время последнего входа пользователя",
+    description="Возвращает user_id, username и last_seen"
+)
+@response_schema(UserLastSeenSchema, 200)
+async def get_user_last_seen(request: web.Request):
+    jwt_payload = get_jwt_payload(request)
+    requester_id = int(jwt_payload["sub"])
+
+    user_id = int(request.match_info["user_id"])
+
+    async with engine.connect() as conn:
+        result = await conn.execute(
+            select(
+                Users.c.user_id,
+                Users.c.username,
+                Users.c.last_seen
+            ).where(Users.c.user_id == user_id)
+        )
+        user = result.fetchone()
+
+    if not user:
+        raise web.HTTPNotFound(text="Пользователь не найден")
+
+    return web.json_response({
+        "user_id": user.user_id,
+        "username": user.username,
+        "last_seen": user.last_seen.isoformat() if user.last_seen else None
+    })
+
+
+def setup_user_routes(app: web.Application):
+    app.add_routes(routes)

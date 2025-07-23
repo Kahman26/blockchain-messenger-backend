@@ -32,3 +32,10 @@ class UserResponseSchema(Schema):
     is_admin = fields.Boolean()
     is_blocked = fields.Boolean()
     updated_at = fields.DateTime()
+
+
+class UserLastSeenSchema(Schema):
+    user_id = fields.Int(required=True, example=2)
+    username = fields.Str(required=True, example="Andrey")
+    last_seen = fields.DateTime(required=True, example="2025-07-23T14:20:00")
+

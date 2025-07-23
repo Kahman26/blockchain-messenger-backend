@@ -2,3 +2,8 @@
 .env
 env/
 app/.env
+
+alembic/env.py
+
+prompt.txt
+nano in server

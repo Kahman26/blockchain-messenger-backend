@@ -24,3 +24,14 @@ class ChatListSchema(Schema):
 class ChatAddMemberSchema(Schema):
     user_id = fields.Int(required=True)
 
+
+class ChatMemberSchema(Schema):
+    id = fields.Int(required=True)
+    username = fields.Str(required=True)
+    public_key = fields.Str(required=True)
+    last_seen = fields.DateTime(required=True)
+
+
+class ChatMembersResponseSchema(Schema):
+    members = fields.List(fields.Nested(ChatMemberSchema))
+

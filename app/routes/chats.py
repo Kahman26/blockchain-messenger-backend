@@ -2,17 +2,32 @@ from aiohttp import web
 from aiohttp_apispec import docs, request_schema, response_schema
 from sqlalchemy import select, insert, func
 from app.database.db import engine
-from app.database.models import Chats, ChatMembers, ChatUserRoles, BlockchainTransactions, BlockchainPayloads
+from app.database.models import (
+    Users,
+    Chats,
+    ChatMembers,
+    ChatUserRoles,
+    BlockchainTransactions,
+    BlockchainPayloads,
+    UserKeys,
+)
 from app.utils.auth import get_jwt_payload, decode_access_token
 
-from app.schemas.chats import ChatCreateSchema, ChatResponseSchema, ChatListSchema, ChatAddMemberSchema
+from app.schemas.chats import (
+    ChatCreateSchema,
+    ChatResponseSchema,
+    ChatListSchema,
+    ChatAddMemberSchema,
+    ChatMembersResponseSchema
+)
 from app.schemas.messages import (
     SendMessageSchema,
     SendMessageResponseSchema,
     InboxMessageSchema,
     EncryptedPerUserSchema,
     EncryptedBroadcastListSchema,
-    ChatMessageSchema
+    ChatMessageSchema,
+    ChatMessageListSchema
 )
 
 from app.utils.blockchain import (
@@ -179,6 +194,57 @@ async def add_chat_member(request: web.Request):
     return web.json_response({"message": "Пользователь добавлен"})
 
 
+@docs(
+    tags=["chats"],
+    summary="Получить список участников чата",
+    description="Возвращает список участников с их username, public_key и last_seen"
+)
+@response_schema(ChatMembersResponseSchema, 200)
+async def get_chat_members(request: web.Request):
+    # Получаем user_id текущего пользователя
+    jwt_payload = get_jwt_payload(request)
+    current_user_id = int(jwt_payload["sub"])
+
+    chat_id = int(request.match_info["chat_id"])
+
+    async with engine.connect() as conn:
+        # Проверка: является ли пользователь участником чата
+        result = await conn.execute(
+            select(ChatMembers).where(
+                (ChatMembers.c.chat_id == chat_id) &
+                (ChatMembers.c.user_id == current_user_id)
+            )
+        )
+        if not result.fetchone():
+            raise web.HTTPForbidden(text="Вы не участник этого чата")
+
+        # Получение участников чата
+        result = await conn.execute(
+            select(
+                Users.c.user_id,
+                Users.c.username,
+                Users.c.last_seen,
+                UserKeys.c.public_key
+            )
+            .select_from(ChatMembers
+                .join(Users, ChatMembers.c.user_id == Users.c.user_id)
+                .join(UserKeys, UserKeys.c.user_id == Users.c.user_id)
+            )
+            .where(ChatMembers.c.chat_id == chat_id)
+        )
+
+        members = []
+        for row in result.fetchall():
+            members.append({
+                "id": row.user_id,
+                "username": row.username,
+                "public_key": row.public_key,
+                "last_seen": row.last_seen.isoformat() if row.last_seen else None
+            })
+
+    return web.json_response({"members": members})
+
+
 @docs(tags=["chats"], summary="Удалить участника из чата (только для админов)")
 async def remove_chat_member(request: web.Request):
     jwt_payload = get_jwt_payload(request)
@@ -267,9 +333,9 @@ async def send_chat_message(request: web.Request):
 @docs(
     tags=["Messages"],
     summary="Получить все сообщения чата (зашифрованные)",
-    description="По одному сообщению из каждого блока, показывает зашифрованные данные"
+    description="По одному сообщению из каждого блока, включает username, подпись и зашифрованный текст"
 )
-@response_schema(ChatMessageSchema(many=True), 200)
+@response_schema(ChatMessageListSchema, 200)
 async def get_chat_messages(request: web.Request):
     user_id = await get_current_user_id(request)
     chat_id = int(request.match_info["chat_id"])
@@ -285,9 +351,21 @@ async def get_chat_messages(request: web.Request):
         if not result.fetchone():
             raise web.HTTPForbidden(text="Вы не состоите в этом чате")
 
-        # Получаем все транзакции, где участвует пользователь
+        # Транзакции по чату, где пользователь участник
         tx_result = await conn.execute(
-            select(BlockchainTransactions)
+            select(
+                BlockchainTransactions.c.transaction_id,
+                BlockchainTransactions.c.sender_id,
+                BlockchainTransactions.c.signature,
+                BlockchainTransactions.c.timestamp,
+                BlockchainPayloads.c.encrypted_data,
+                Users.c.username
+            )
+            .select_from(
+                BlockchainTransactions
+                .join(BlockchainPayloads, BlockchainTransactions.c.transaction_id == BlockchainPayloads.c.transaction_id)
+                .join(Users, BlockchainTransactions.c.sender_id == Users.c.user_id)
+            )
             .where(
                 (BlockchainTransactions.c.chat_id == chat_id) &
                 (
@@ -297,37 +375,44 @@ async def get_chat_messages(request: web.Request):
             )
             .order_by(BlockchainTransactions.c.timestamp.asc())
         )
-        all_transactions = tx_result.fetchall()
 
-        # Группируем по block_id
-        from collections import defaultdict
-        block_map = defaultdict(list)
-        for tx in all_transactions:
-            block_map[tx.block_id].append(tx)
+        tx_list = tx_result.fetchall()
 
+        # Группировка по block_id
+        all_tx_result = await conn.execute(
+            select(
+                BlockchainTransactions.c.transaction_id,
+                BlockchainTransactions.c.block_id,
+                BlockchainTransactions.c.sender_id,
+                BlockchainTransactions.c.receiver_id
+            ).where(BlockchainTransactions.c.chat_id == chat_id)
+        )
+        all_tx_by_block = {}
+        for tx in all_tx_result.fetchall():
+            all_tx_by_block.setdefault(tx.block_id, []).append(tx)
+
+        # Уникальные сообщения: по одной транзакции с приоритетом входящей
+        selected_tx_ids = set()
+        for block_id, group in all_tx_by_block.items():
+            preferred = next((tx for tx in group if tx.receiver_id == user_id), group[0])
+            selected_tx_ids.add(preferred.transaction_id)
+
+        # Формирование ответа
         messages = []
-
-        for block_id, tx_list in block_map.items():
-            # Сначала пытаемся найти именно входящую для текущего пользователя
-            preferred_tx = next((tx for tx in tx_list if tx.receiver_id == user_id), tx_list[0])
-
-            payload_result = await conn.execute(
-                select(BlockchainPayloads).where(
-                    BlockchainPayloads.c.transaction_id == preferred_tx.transaction_id
-                )
-            )
-            payload = payload_result.fetchone()
-            if not payload:
+        for row in tx_list:
+            if row.transaction_id not in selected_tx_ids:
                 continue
-
-            # ❗ Возвращаем зашифрованное сообщение, без расшифровки
             messages.append({
-                "from_user_id": preferred_tx.sender_id,
-                "message": payload.encrypted_data,
-                "timestamp": preferred_tx.timestamp.isoformat()
+                "message_id": row.transaction_id,
+                "from_user_id": row.sender_id,
+                "from_username": row.username,
+                "encrypted_data": row.encrypted_data,
+                "signature": row.signature,
+                "timestamp": row.timestamp.isoformat()
             })
 
-    return web.json_response(messages)
+    return web.json_response({"messages": messages})
+
 
 
 
@@ -337,6 +422,7 @@ def setup_chat_routes(app: web.Application):
     app.router.add_get("/chats/", get_user_chats, allow_head=False)
     app.router.add_get("/chats/{chat_id}", get_chat_info, allow_head=False)
     app.router.add_post("/chats/{chat_id}/members", add_chat_member)
+    app.router.add_get("/chats/{chat_id}/members", get_chat_members, allow_head=False)
     app.router.add_delete("/chats/{chat_id}/members/{user_id}", remove_chat_member)
     app.router.add_post("/chats/{chat_id}/send", send_chat_message)
     app.router.add_get("/chats/{chat_id}/messages", get_chat_messages, allow_head=False)
