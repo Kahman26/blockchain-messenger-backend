@@ -9,7 +9,7 @@ metadata = MetaData()
 Notifications = Table(
     "Notifications", metadata,
     Column("notification_id", BigInteger, primary_key=True, autoincrement=True),
-    Column("user_id", Integer, ForeignKey("Users.user_id"), nullable=False),
+    Column("user_id", Integer, ForeignKey("Users.user_id", ondelete="CASCADE"), nullable=False),
     Column("notification_content", Text, nullable=False),
     Column("sent_at", DateTime, nullable=False, server_default=func.now()),
     Column("read_at", DateTime),
@@ -18,7 +18,7 @@ Notifications = Table(
 Contacts = Table(
     "Contacts", metadata,
     Column("contact_id", Integer, primary_key=True, autoincrement=True),
-    Column("user_id", Integer, ForeignKey("Users.user_id"), nullable=False),
+    Column("user_id", Integer, ForeignKey("Users.user_id", ondelete="CASCADE"), nullable=False),
     Column("contact_user_id", Integer, nullable=False),
     Column("added_at", DateTime, nullable=False, server_default=func.now()),
 )
@@ -37,7 +37,7 @@ Chats = Table(
 UserSettings = Table(
     "UserSettings", metadata,
     Column("setting_id", BigInteger, primary_key=True, autoincrement=True),
-    Column("user_id", Integer, ForeignKey("Users.user_id"), nullable=False),
+    Column("user_id", Integer, ForeignKey("Users.user_id", ondelete="CASCADE"), nullable=False),
     Column("setting_key", String(50), nullable=False),
     Column("setting_value", String(255), nullable=False),
     Column("edited_at", DateTime, server_default=func.now(), onupdate=func.now()),
@@ -46,7 +46,7 @@ UserSettings = Table(
 BannedUsers = Table(
     "BannedUsers", metadata,
     Column("ban_id", Integer, primary_key=True, autoincrement=True),
-    Column("user_id", Integer, ForeignKey("Users.user_id"), nullable=False),
+    Column("user_id", Integer, ForeignKey("Users.user_id", ondelete="CASCADE"), nullable=False),
     Column("banned_at", DateTime, nullable=False, server_default=func.now()),
     Column("unban_at", DateTime),
     Column("reason", Text),
@@ -95,8 +95,8 @@ Admins = Table(
 
 ChatMembers = Table(
     "ChatMembers", metadata,
-    Column("chat_id", BigInteger, ForeignKey("Chats.chat_id"), primary_key=True),
-    Column("user_id", Integer, ForeignKey("Users.user_id"), primary_key=True),
+    Column("chat_id", BigInteger, ForeignKey("Chats.chat_id", ondelete="CASCADE"), primary_key=True),
+    Column("user_id", Integer, ForeignKey("Users.user_id", ondelete="CASCADE"), primary_key=True),
     Column("joined_at", DateTime, nullable=False, server_default=func.now()),
 )
 
@@ -133,16 +133,16 @@ BlockchainBlocks = Table(
     Column("block_hash", CHAR(64), nullable=False, unique=True),
     Column("timestamp", DateTime, nullable=False, server_default=func.now()),
     Column("nonce", BigInteger, nullable=False),
-    Column("creator_user_id", Integer, ForeignKey("Users.user_id")),
+    Column("creator_user_id", Integer, ForeignKey("Users.user_id", ondelete="CASCADE")),
 )
 
 BlockchainTransactions = Table(
     "BlockchainTransactions", metadata,
     Column("transaction_id", BigInteger, primary_key=True, autoincrement=True),
     Column("block_id", Integer, ForeignKey("BlockchainBlocks.block_id", ondelete="CASCADE"), nullable=False),
-    Column("sender_id", Integer, ForeignKey("Users.user_id"), nullable=False),
-    Column("receiver_id", Integer, ForeignKey("Users.user_id"), nullable=False),
-    Column("chat_id", BigInteger, ForeignKey("Chats.chat_id"), nullable=True),  # <--- НОВОЕ
+    Column("sender_id", Integer, ForeignKey("Users.user_id", ondelete="CASCADE"), nullable=False),
+    Column("receiver_id", Integer, ForeignKey("Users.user_id", ondelete="CASCADE"), nullable=False),
+    Column("chat_id", BigInteger, ForeignKey("Chats.chat_id", ondelete="CASCADE"), nullable=True),
     Column("payload_hash", CHAR(64), nullable=False),
     Column("signature", Text, nullable=False),
     Column("timestamp", DateTime, nullable=False, server_default=func.now()),
@@ -157,7 +157,7 @@ BlockchainPayloads = Table(
 
 UserKeys = Table(
     "UserKeys", metadata,
-    Column("user_id", Integer, ForeignKey("Users.user_id"), primary_key=True),
+    Column("user_id", Integer, ForeignKey("Users.user_id", ondelete="CASCADE"), primary_key=True),
     Column("public_key", Text, nullable=False),
     Column("created_at", DateTime, nullable=False, server_default=func.now()),
 )
