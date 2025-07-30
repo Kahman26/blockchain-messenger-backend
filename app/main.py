@@ -5,6 +5,7 @@ from aiohttp_apispec import setup_aiohttp_apispec
 from app.routes.auth import routes as auth_routes
 from app.routes.users import setup_user_routes
 from app.routes.chats import setup_chat_routes
+from app.routes.websocket import setup_websocket_routes
 
 from app.config import settings
 from app.database.db import engine
@@ -33,6 +34,8 @@ def create_app() -> web.Application:
     setup_user_routes(app)
 
     setup_chat_routes(app)
+
+    setup_websocket_routes(app)
 
     setup_aiohttp_apispec(
         app=app,

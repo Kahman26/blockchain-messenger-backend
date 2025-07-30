@@ -4,6 +4,10 @@ from app.config import settings
 from typing import Optional
 from aiohttp import web
 
+from app.database.db import engine
+from app.database.models import Users
+from sqlalchemy import select
+
 
 def create_access_token(data: dict, expires_delta: Optional[int] = None) -> str:
     to_encode = data.copy()
@@ -36,4 +40,18 @@ def get_jwt_payload(request: web.Request) -> dict:
         raise web.HTTPUnauthorized(reason="Invalid JWT token")
 
     return payload
+
+
+async def get_user_from_token(token: str):
+    try:
+        payload = decode_access_token(token)
+        user_id = int(payload.get("sub"))
+        if not user_id:
+            return None
+
+        async with engine.connect() as conn:
+            result = await conn.execute(select(Users).where(Users.c.user_id == user_id))
+            return result.fetchone()
+    except Exception:
+        return None
 
