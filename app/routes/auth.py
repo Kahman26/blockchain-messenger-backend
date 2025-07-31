@@ -1,13 +1,19 @@
 from aiohttp import web
 from app.utils.email import send_verification_email
-from app.utils.auth import create_access_token
+from app.utils.auth import create_access_token, verify_refresh_token, create_refresh_token
 from app.utils.password import hash_password, verify_password
 from app.schemas.auth import *
 from app.database import auth as db_auth
-from datetime import datetime
 import random
 
 from aiohttp_apispec import docs, request_schema, response_schema
+
+from app.database.models import RefreshTokens
+from sqlalchemy import select, insert, update
+from app.database.db import engine
+from datetime import datetime, timedelta
+from app.config import settings
+
 
 routes = web.RouteTableDef()
 
@@ -111,14 +117,28 @@ async def login(request: web.Request):
     # if user.is_blocked:
     #     return web.json_response({"error": "User is blocked"}, status=403)
 
-    token = create_access_token({
+    access_token = create_access_token({
+        "sub": str(user.user_id),
+        "email": user.email,
+    })
+    refresh_token = create_refresh_token({
         "sub": str(user.user_id),
         "email": user.email,
     })
 
+    async with engine.begin() as conn:
+        await conn.execute(
+            insert(RefreshTokens).values(
+                user_id=user.user_id,
+                token=refresh_token,
+                expires_at=datetime.utcnow() + timedelta(seconds=settings.JWT_REFRESH_EXP_SECONDS)
+            )
+        )
+
     return web.json_response({
         "user_id": user.user_id,
-        "access_token": token,
+        "access_token": access_token,
+        "refresh_token": refresh_token,
     })
 
 
@@ -177,3 +197,74 @@ async def reset_password(request: web.Request):
     await db_auth.touch_email_verification(email, now)
 
     return web.json_response({"message": "Password successfully reset"})
+
+
+@routes.post("/auth/refresh")
+@docs(tags=["Auth"], summary="Обновление токенов")
+@request_schema(RefreshTokenSchema)
+@response_schema(TokenResponse, 200)
+async def refresh_tokens(request: web.Request):
+    data = await request.json()
+    refresh_token = data["refresh_token"]
+
+    # Проверяем токен в базе
+    async with engine.connect() as conn:
+        result = await conn.execute(
+            select(RefreshTokens)
+            .where(RefreshTokens.c.token == refresh_token)
+            .where(RefreshTokens.c.is_revoked == False)
+            .where(RefreshTokens.c.expires_at > datetime.utcnow())
+        )
+        token_record = result.fetchone()
+
+    if not token_record:
+        raise web.HTTPUnauthorized(text="Invalid refresh token")
+
+    # Проверяем подпись токена
+    payload = await verify_refresh_token(refresh_token)
+    if not payload:
+        raise web.HTTPUnauthorized(text="Invalid refresh token")
+
+    # Создаем новую пару токенов
+    new_access_token = create_access_token({"sub": payload["sub"], "email": payload["email"]})
+    new_refresh_token = create_refresh_token({"sub": payload["sub"], "email": payload["email"]})
+
+    # Обновляем refresh токен в базе
+    async with engine.begin() as conn:
+        # Отзываем старый токен
+        await conn.execute(
+            update(RefreshTokens)
+            .where(RefreshTokens.c.token_id == token_record.token_id)
+            .values(is_revoked=True)
+        )
+
+        # Добавляем новый токен
+        await conn.execute(
+            insert(RefreshTokens).values(
+                user_id=payload["sub"],
+                token=new_refresh_token,
+                expires_at=datetime.utcnow() + timedelta(seconds=settings.JWT_REFRESH_EXP_SECONDS)
+            )
+        )
+
+    return web.json_response({
+        "access_token": new_access_token,
+        "refresh_token": new_refresh_token,
+    })
+
+
+@routes.post("/auth/logout")
+@docs(tags=["Auth"], summary="Выход из системы")
+@request_schema(RefreshTokenSchema)
+async def logout(request: web.Request):
+    data = await request.json()
+    refresh_token = data["refresh_token"]
+
+    async with engine.begin() as conn:
+        await conn.execute(
+            update(RefreshTokens)
+            .where(RefreshTokens.c.token == refresh_token)
+            .values(is_revoked=True)
+        )
+
+    return web.json_response({"message": "Logged out successfully"})

@@ -55,3 +55,18 @@ async def get_user_from_token(token: str):
     except Exception:
         return None
 
+
+def create_refresh_token(data: dict) -> str:
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(seconds=settings.JWT_REFRESH_EXP_SECONDS)
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, settings.JWT_REFRESH_SECRET, algorithm=settings.JWT_ALGORITHM)
+
+
+async def verify_refresh_token(token: str) -> Optional[dict]:
+    try:
+        payload = jwt.decode(token, settings.JWT_REFRESH_SECRET, algorithms=[settings.JWT_ALGORITHM])
+        return payload
+    except jwt.PyJWTError:
+        return None
+

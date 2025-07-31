@@ -175,3 +175,13 @@ BlockchainFiles = Table(
     Column("thumbnail_base64", Text),  # превью (опционально, например, для изображений)
     Column("created_at", DateTime, nullable=False, server_default=func.now()),
 )
+
+RefreshTokens = Table(
+    "RefreshTokens", metadata,
+    Column("token_id", BigInteger, primary_key=True, autoincrement=True),
+    Column("user_id", Integer, ForeignKey("Users.user_id", ondelete="CASCADE"), nullable=False),
+    Column("token", String(512), nullable=False, unique=True),
+    Column("expires_at", DateTime, nullable=False),
+    Column("created_at", DateTime, nullable=False, server_default=func.now()),
+    Column("is_revoked", Boolean, nullable=False, server_default="false"),
+)

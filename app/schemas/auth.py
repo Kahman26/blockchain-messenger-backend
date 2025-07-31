@@ -46,6 +46,11 @@ class TokenResponse(Schema):
         required=True,
         description="JWT access токен, используемый для авторизации"
     )
+    refresh_token = fields.String(required=True)
+
+
+class RefreshTokenSchema(Schema):
+    refresh_token = fields.String(required=True)
 
 
 class EmailSchema(Schema):
