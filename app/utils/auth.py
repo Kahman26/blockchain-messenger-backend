@@ -66,6 +66,9 @@ def create_refresh_token(data: dict) -> str:
 async def verify_refresh_token(token: str) -> Optional[dict]:
     try:
         payload = jwt.decode(token, settings.JWT_REFRESH_SECRET, algorithms=[settings.JWT_ALGORITHM])
+        exp = payload.get("exp")
+        if datetime.utcfromtimestamp(exp) < datetime.utcnow():
+            return None
         return payload
     except jwt.PyJWTError:
         return None

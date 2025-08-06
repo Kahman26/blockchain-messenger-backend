@@ -18,6 +18,17 @@ from app.config import settings
 routes = web.RouteTableDef()
 
 
+async def revoke_old_refresh_tokens(user_id: int, device_id: str):
+    async with engine.begin() as conn:
+        await conn.execute(
+            update(RefreshTokens)
+            .where(RefreshTokens.c.user_id == user_id)
+            .where(RefreshTokens.c.device_id == device_id)
+            .where(RefreshTokens.c.is_revoked == False)
+            .values(is_revoked=True)
+        )
+
+
 @routes.post("/auth/register")
 @docs(tags=["Auth"], summary="Регистрация", description="Создание нового пользователя и отправка кода подтверждения")
 @request_schema(RegisterSchema)
@@ -105,6 +116,10 @@ async def login(request: web.Request):
     data = await request.json()
     email = data.get("email")
     password = data.get("password")
+    device_id = data.get("device_id")
+
+    if not device_id:
+        return web.json_response({"error": "Device ID required"}, status=400)
 
     user = await db_auth.get_user_by_email(email)
     if not user or not verify_password(password, user.password_hash):
@@ -116,6 +131,14 @@ async def login(request: web.Request):
     # будет переделано:
     # if user.is_blocked:
     #     return web.json_response({"error": "User is blocked"}, status=403)
+
+    async with engine.begin() as conn:
+        await conn.execute(
+            update(RefreshTokens)
+            .where(RefreshTokens.c.user_id == user.user_id)
+            .where(RefreshTokens.c.device_id == device_id)
+            .values(is_revoked=True)
+        )
 
     access_token = create_access_token({
         "sub": str(user.user_id),
@@ -131,6 +154,7 @@ async def login(request: web.Request):
             insert(RefreshTokens).values(
                 user_id=user.user_id,
                 token=refresh_token,
+                device_id=device_id,
                 expires_at=datetime.utcnow() + timedelta(seconds=settings.JWT_REFRESH_EXP_SECONDS)
             )
         )
@@ -206,12 +230,14 @@ async def reset_password(request: web.Request):
 async def refresh_tokens(request: web.Request):
     data = await request.json()
     refresh_token = data["refresh_token"]
+    device_id = data["device_id"]
 
     # Проверяем токен в базе
     async with engine.connect() as conn:
         result = await conn.execute(
             select(RefreshTokens)
             .where(RefreshTokens.c.token == refresh_token)
+            .where(RefreshTokens.c.device_id == device_id)
             .where(RefreshTokens.c.is_revoked == False)
             .where(RefreshTokens.c.expires_at > datetime.utcnow())
         )
@@ -243,6 +269,7 @@ async def refresh_tokens(request: web.Request):
             insert(RefreshTokens).values(
                 user_id=payload["sub"],
                 token=new_refresh_token,
+                device_id=device_id,
                 expires_at=datetime.utcnow() + timedelta(seconds=settings.JWT_REFRESH_EXP_SECONDS)
             )
         )

@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     DB_URL: str
     JWT_SECRET: str
     JWT_ALGORITHM: str = "HS256"
-    JWT_EXP_SECONDS: int = 3600  # 1 час
+    JWT_EXP_SECONDS: int = 900  # 15 мин
 
     JWT_REFRESH_EXP_SECONDS: int = 30 * 24 * 3600  # 30 дней
     JWT_REFRESH_SECRET: str = secrets.token_urlsafe(32)
