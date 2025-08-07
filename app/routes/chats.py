@@ -127,6 +127,8 @@ async def create_chat(request: web.Request):
     return web.json_response({"chat_id": chat_id}, status=201)
 
 
+from datetime import datetime
+
 @docs(tags=["chats"], summary="Получить список чатов текущего пользователя с датой последнего сообщения")
 @response_schema(ChatListSchema, 200)
 async def get_user_chats(request: web.Request):
@@ -155,10 +157,18 @@ async def get_user_chats(request: web.Request):
         chats = []
         for row in result.fetchall():
             chat_type = row.chat_type
+            last_time = row.last_message_time
+
+            if isinstance(last_time, str):
+                try:
+                    last_time = datetime.fromisoformat(last_time)
+                except ValueError:
+                    pass
+
             chat_data = {
                 "chat_id": row.chat_id,
                 "chat_type": chat_type,
-                "last_message_time": row.last_message_time.isoformat() if row.last_message_time else None
+                "last_message_time": last_time.isoformat() if isinstance(last_time, datetime) else last_time
             }
 
             if chat_type == "private":
