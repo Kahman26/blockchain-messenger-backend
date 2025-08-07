@@ -57,27 +57,65 @@ async def create_chat(request: web.Request):
     jwt_payload = get_jwt_payload(request)
     user_id = int(jwt_payload["sub"])
 
+    chat_type = data["chat_type"]
+    chat_name = data.get("chat_name")
+    description = data.get("description")
+
+    if chat_type == "private":
+        other_user_id = data.get("other_user_id")
+        if not other_user_id:
+            raise web.HTTPBadRequest(reason="Для приватного чата требуется other_user_id")
+
     async with engine.begin() as conn:
-        # Создаём чат
+        # Получаем username создателя
+        result = await conn.execute(
+            select(Users.c.username).where(Users.c.user_id == user_id)
+        )
+        user_username = result.scalar()
+
+        other_username = None
+        if chat_type == "private":
+            result = await conn.execute(
+                select(Users.c.username).where(Users.c.user_id == other_user_id)
+            )
+            other_username = result.scalar()
+            if not other_username:
+                raise web.HTTPNotFound(reason="Второй пользователь не найден")
+
+        # Создание чата
         result = await conn.execute(
             insert(Chats).values(
-                chat_name=data["chat_name"],
-                chat_type=data["chat_type"],
+                chat_name=None if chat_type == "private" else chat_name,
+                chat_type=chat_type,
                 creator_user_id=user_id,
-                description=data.get("description")
+                description=description
             ).returning(Chats.c.chat_id)
         )
         chat_id = result.scalar()
 
-        # Добавляем создателя в участники
-        await conn.execute(
-            insert(ChatMembers).values(
-                chat_id=chat_id,
-                user_id=user_id
-            )
-        )
+        # Добавление участников
+        members_to_insert = []
+        if chat_type == "private":
+            members_to_insert.append({
+                "chat_id": chat_id,
+                "user_id": user_id,
+                "display_name": other_username
+            })
+            members_to_insert.append({
+                "chat_id": chat_id,
+                "user_id": other_user_id,
+                "display_name": user_username
+            })
+        else:
+            members_to_insert.append({
+                "chat_id": chat_id,
+                "user_id": user_id,
+                "display_name": None
+            })
 
-        # Присваиваем роль "admin" (id = 1)
+        await conn.execute(insert(ChatMembers), members_to_insert)
+
+        # Присвоение роли "admin"
         await conn.execute(
             insert(ChatUserRoles).values(
                 chat_id=chat_id,
@@ -98,7 +136,10 @@ async def get_user_chats(request: web.Request):
     async with engine.connect() as conn:
         result = await conn.execute(
             select(
-                Chats,
+                Chats.c.chat_id,
+                Chats.c.chat_type,
+                Chats.c.chat_name,
+                ChatMembers.c.display_name,
                 func.max(BlockchainTransactions.c.timestamp).label("last_message_time")
             )
             .select_from(
@@ -107,14 +148,24 @@ async def get_user_chats(request: web.Request):
                 .outerjoin(BlockchainTransactions, Chats.c.chat_id == BlockchainTransactions.c.chat_id)
             )
             .where(ChatMembers.c.user_id == user_id)
-            .group_by(Chats.c.chat_id)
+            .group_by(Chats.c.chat_id, Chats.c.chat_type, Chats.c.chat_name, ChatMembers.c.display_name)
             .order_by(func.max(BlockchainTransactions.c.timestamp).desc())
         )
 
         chats = []
         for row in result.fetchall():
-            chat_data = {col.name: row._mapping[col.name] for col in Chats.c}
-            chat_data["last_message_time"] = row._mapping["last_message_time"]
+            chat_type = row.chat_type
+            chat_data = {
+                "chat_id": row.chat_id,
+                "chat_type": chat_type,
+                "last_message_time": row.last_message_time.isoformat() if row.last_message_time else None
+            }
+
+            if chat_type == "private":
+                chat_data["chat_name"] = row.display_name
+            else:
+                chat_data["chat_name"] = row.chat_name
+
             chats.append(chat_data)
 
     schema = ChatListSchema()
@@ -130,18 +181,38 @@ async def get_chat_info(request: web.Request):
 
     async with engine.connect() as conn:
         result = await conn.execute(
-            select(Chats)
-            .join(ChatMembers, Chats.c.chat_id == ChatMembers.c.chat_id)
-            .where(ChatMembers.c.user_id == user_id,
-                   Chats.c.chat_id == chat_id)
+            select(
+                Chats.c.chat_id,
+                Chats.c.chat_type,
+                Chats.c.chat_name,
+                Chats.c.creator_user_id,
+                Chats.c.description,
+                ChatMembers.c.display_name
+            )
+            .select_from(
+                Chats.join(ChatMembers, Chats.c.chat_id == ChatMembers.c.chat_id)
+            )
+            .where(
+                ChatMembers.c.user_id == user_id,
+                Chats.c.chat_id == chat_id
+            )
         )
         chat = result.fetchone()
 
     if not chat:
         raise web.HTTPForbidden(reason="Чат не найден или доступ запрещён")
 
+    chat_dict = dict(chat._mapping)
+
+    # Подменяем chat_name, если чат приватный
+    if chat_dict["chat_type"] == "private":
+        chat_dict["chat_name"] = chat_dict["display_name"]
+
+    # Удаляем display_name из ответа (не входит в схему)
+    chat_dict.pop("display_name", None)
+
     schema = ChatResponseSchema()
-    return web.json_response(schema.dump(dict(chat._mapping)))
+    return web.json_response(schema.dump(chat_dict))
 
 
 @docs(tags=["chats"], summary="Добавить участника в чат (group, channel, или второй участник private-чата)")

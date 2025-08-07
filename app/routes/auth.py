@@ -232,6 +232,9 @@ async def refresh_tokens(request: web.Request):
     refresh_token = data["refresh_token"]
     device_id = data["device_id"]
 
+    if device_id is None:
+        return web.json_response({"error": "Missing device_id"}, status=400)
+
     # Проверяем токен в базе
     async with engine.connect() as conn:
         result = await conn.execute(
@@ -267,7 +270,7 @@ async def refresh_tokens(request: web.Request):
         # Добавляем новый токен
         await conn.execute(
             insert(RefreshTokens).values(
-                user_id=payload["sub"],
+                user_id=int(payload["sub"]),
                 token=new_refresh_token,
                 device_id=device_id,
                 expires_at=datetime.utcnow() + timedelta(seconds=settings.JWT_REFRESH_EXP_SECONDS)

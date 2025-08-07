@@ -97,6 +97,7 @@ ChatMembers = Table(
     "ChatMembers", metadata,
     Column("chat_id", BigInteger, ForeignKey("Chats.chat_id", ondelete="CASCADE"), primary_key=True),
     Column("user_id", Integer, ForeignKey("Users.user_id", ondelete="CASCADE"), primary_key=True),
+    Column("display_name", String),
     Column("joined_at", DateTime, nullable=False, server_default=func.now()),
 )
 

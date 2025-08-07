@@ -7,3 +7,5 @@ alembic/env.py
 
 prompt.txt
 nano in server
+collect_full_project.py
+full_project_files.txt

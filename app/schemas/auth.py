@@ -39,6 +39,9 @@ class LoginSchema(Schema):
         example="123456",
         description="Пароль, указанный при регистрации"
     )
+    device_id = fields.String(
+        required=True,
+    )
 
 
 class TokenResponse(Schema):
