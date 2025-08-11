@@ -11,7 +11,7 @@ from app.utils.locks import get_user_lock
 from app.schemas.users import CreateUserSchema, UpdateUserSchema, UserResponseSchema, UserLastSeenSchema
 
 # потом убрать и сделать отдельный файл с бд
-from sqlalchemy import select, insert, func
+from sqlalchemy import select, insert, func, or_
 from app.database.db import engine
 from app.database.models import Users
 
@@ -186,6 +186,46 @@ async def get_user_last_seen(request: web.Request):
         "username": user.username,
         "last_seen": user.last_seen.isoformat() if user.last_seen else None
     })
+
+
+@routes.get("/users/search", allow_head=False)
+@docs(tags=["Users"], summary="Поиск пользователей")
+async def search_users(request: web.Request):
+    # проверяем и получаем текущего пользователя (валидный токен)
+    await get_current_user(request)
+
+    q = request.rel_url.query.get('q', '').strip()
+    if not q:
+        return web.json_response({'users': []})
+
+    pattern = f"%{q}%"
+    async with engine.connect() as conn:
+        result = await conn.execute(
+            select(
+                Users.c.user_id,
+                Users.c.username,
+                Users.c.email,
+                Users.c.phone_number
+            ).where(
+                or_(
+                    Users.c.username.ilike(pattern),
+                    Users.c.email.ilike(pattern),
+                    Users.c.phone_number.ilike(pattern)
+                )
+            ).limit(50)
+        )
+        rows = result.fetchall()
+
+    users = []
+    for row in rows:
+        users.append({
+            "id": row.user_id,
+            "display_name": row.username,
+            "email": row.email,
+            "phone_number": row.phone_number,
+        })
+
+    return web.json_response({"users": users})
 
 
 def setup_user_routes(app: web.Application):

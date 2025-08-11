@@ -1,4 +1,5 @@
 from aiohttp import web
+from datetime import datetime
 from aiohttp_apispec import docs, request_schema, response_schema
 from sqlalchemy import select, insert, func
 from app.database.db import engine
@@ -126,8 +127,6 @@ async def create_chat(request: web.Request):
 
     return web.json_response({"chat_id": chat_id}, status=201)
 
-
-from datetime import datetime
 
 @docs(tags=["chats"], summary="Получить список чатов текущего пользователя с датой последнего сообщения")
 @response_schema(ChatListSchema, 200)
