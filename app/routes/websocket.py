@@ -26,21 +26,32 @@ async def websocket_handler(request):
         async for msg in ws:
             if msg.type == WSMsgType.TEXT:
                 data = json.loads(msg.data)
-                # Пример логики — отправка сообщения пользователю
+
+                # ожидаем от клиента: to_user_id, payload, chat_id, signature
                 to_user_id = data.get("to_user_id")
                 payload = data.get("payload")
+                chat_id = data.get("chat_id")
+                signature = data.get("signature")
+
+                if not to_user_id or not payload or not chat_id:
+                    # можно дополнительно логировать/валидировать
+                    continue
 
                 if to_user_id in connected_clients:
                     await connected_clients[to_user_id].send_json({
+                        "type": "message",
+                        "chat_id": chat_id,
                         "from_user_id": user_id,
-                        "payload": payload
+                        "payload": payload,
+                        "signature": signature,
                     })
 
             elif msg.type == WSMsgType.ERROR:
-                print(f"❌ WebSocket ошибка: {ws.exception()}")
+                print(f"WebSocket ошибка: {ws.exception()}")
     finally:
         print(f"🔴 WebSocket отключён: user_id={user_id}")
-        del connected_clients[user_id]
+        if user_id in connected_clients:
+            del connected_clients[user_id]
 
     return ws
 
