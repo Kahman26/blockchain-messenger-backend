@@ -407,7 +407,7 @@ async def send_chat_message(request: web.Request):
         await db_chain.store_encrypted_payload(tx_id, encrypted)
         tx_ids.append(tx_id)
 
-    await notify_message(chat_id, sender_id, payload, signature)
+    await notify_message(chat_id, sender_id)
     await notify_chat_updated(chat_id, exclude_user_id=None)
 
     return web.json_response({
