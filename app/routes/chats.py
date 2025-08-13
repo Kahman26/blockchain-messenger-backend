@@ -43,7 +43,7 @@ from app.database import blockchain as db_chain
 
 from random import randint
 
-from app.routes.websocket import notify_chat_updated
+from app.routes.websocket import notify_chat_updated, notify_message
 
 
 async def get_current_user_id(request: web.Request) -> int:
@@ -394,18 +394,21 @@ async def send_chat_message(request: web.Request):
         if receiver_id not in valid_receivers:
             continue
 
+        payload = calculate_hash({"data": encrypted})
+
         tx_id = await db_chain.add_transaction(
             block_id=block_id,
             sender_id=sender_id,
             receiver_id=receiver_id,
             chat_id=chat_id,
-            payload_hash=calculate_hash({"data": encrypted}),
+            payload_hash=payload,
             signature=signature
         )
         await db_chain.store_encrypted_payload(tx_id, encrypted)
         tx_ids.append(tx_id)
 
-    await notify_chat_updated(chat_id, exclude_user_id=sender_id)
+    await notify_message(chat_id, sender_id, payload, signature)
+    await notify_chat_updated(chat_id, exclude_user_id=None)
 
     return web.json_response({
         "message": f"Успешно отправлено {len(tx_ids)} сообщений",

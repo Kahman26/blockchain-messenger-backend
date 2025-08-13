@@ -14,8 +14,6 @@ async def websocket_handler(request: web.Request):
     ws = web.WebSocketResponse(autoping=True)
     await ws.prepare(request)
 
-    # Получаем user_id из JWT токена
-    from app.utils.auth import get_jwt_payload
     payload = get_jwt_payload(request)
     if not payload:
         await ws.close()
@@ -64,6 +62,25 @@ async def notify_chat_updated(chat_id: int, exclude_user_id: int | None = None):
         ws = ONLINE_USERS.get(uid)
         if ws and not ws.closed:
             await ws.send_json(payload)
+
+
+async def notify_message(chat_id, from_user_id, payload, signature):
+    async with engine.connect() as conn:
+        members = await conn.execute(
+            select(ChatMembers.c.user_id).where(ChatMembers.c.chat_id == chat_id)
+        )
+        members = members.fetchall()
+
+    for member in members:
+        uid = member.user_id
+        if uid in ONLINE_USERS and uid != from_user_id:
+            await ONLINE_USERS[uid].send_json({
+                "type": "message",
+                "chat_id": chat_id,
+                "from_user_id": from_user_id,
+                "payload": payload,
+                "signature": signature,
+            })
 
 
 def setup_websocket_routes(app: web.Application):
