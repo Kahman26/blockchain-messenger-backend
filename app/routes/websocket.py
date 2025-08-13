@@ -1,78 +1,69 @@
 from aiohttp import web, WSMsgType
 from app.database.db import engine
 from app.database.models import ChatMembers
-from app.utils.auth import get_user_from_token
+from sqlalchemy import select
+from app.utils.auth import get_user_from_token, get_jwt_payload
 import json
+from datetime import datetime
 
-connected_clients = {}
+
+ONLINE_USERS: dict[int, web.WebSocketResponse] = {}
 
 
-async def websocket_handler(request):
-    ws = web.WebSocketResponse()
+async def websocket_handler(request: web.Request):
+    ws = web.WebSocketResponse(autoping=True)
     await ws.prepare(request)
 
-    token = request.query.get("token")
-    user = await get_user_from_token(token)
-    if not user:
-        await ws.send_json({"error": "unauthorized"})
+    # Получаем user_id из JWT токена
+    from app.utils.auth import get_jwt_payload
+    payload = get_jwt_payload(request)
+    if not payload:
         await ws.close()
         return ws
 
-    user_id = user.user_id
-    connected_clients[user_id] = ws
-    print(f"🟢 WebSocket подключён: user_id={user_id}")
+    user_id = int(payload["sub"])
+    ONLINE_USERS[user_id] = ws
+    print(f"✅ WebSocket подключён: user_id={user_id}")
 
     try:
         async for msg in ws:
             if msg.type == WSMsgType.TEXT:
                 data = json.loads(msg.data)
-
-                # ожидаем от клиента: to_user_id, payload, chat_id, signature
-                to_user_id = data.get("to_user_id")
-                payload = data.get("payload")
-                chat_id = data.get("chat_id")
-                signature = data.get("signature")
-
-                if not to_user_id or not payload or not chat_id:
-                    # можно дополнительно логировать/валидировать
-                    continue
-
-                if to_user_id in connected_clients:
-                    await connected_clients[to_user_id].send_json({
-                        "type": "message",
-                        "chat_id": chat_id,
-                        "from_user_id": user_id,
-                        "payload": payload,
-                        "signature": signature,
-                    })
-
+                # Клиент может прислать ping
+                if data.get("type") == "ping":
+                    await ws.send_json({"type": "pong"})
+                # Больше никаких сообщений от клиента не обрабатываем — всё через REST
             elif msg.type == WSMsgType.ERROR:
                 print(f"WebSocket ошибка: {ws.exception()}")
     finally:
-        print(f"🔴 WebSocket отключён: user_id={user_id}")
-        if user_id in connected_clients:
-            del connected_clients[user_id]
+        ONLINE_USERS.pop(user_id, None)
+        print(f"❌ WebSocket отключён: user_id={user_id}")
 
     return ws
 
 
-async def notify_chat_updated(chat_id: int, exclude_user_id: int = None):
+async def notify_chat_updated(chat_id: int, exclude_user_id: int | None = None):
     """
-    Отправляет событие chat_updated всем участникам чата, кроме exclude_user_id.
+    Шлёт WS-уведомление 'chat_updated' всем участникам чата, кроме исключённого
     """
     async with engine.connect() as conn:
         result = await conn.execute(
-            ChatMembers.select().where(ChatMembers.c.chat_id == chat_id)
+            select(ChatMembers.c.user_id).where(ChatMembers.c.chat_id == chat_id)
         )
-        members = result.fetchall()
+        member_ids = [row.user_id for row in result.fetchall()]
 
-    for member in members:
-        uid = member.user_id
-        if uid in connected_clients and uid != exclude_user_id:
-            await connected_clients[uid].send_json({
-                "type": "chat_updated",
-                "chat_id": chat_id
-            })
+    payload = {
+        "type": "chat_updated",
+        "chat_id": chat_id,
+        "ts": datetime.utcnow().isoformat()
+    }
+
+    for uid in member_ids:
+        if exclude_user_id and uid == exclude_user_id:
+            continue
+        ws = ONLINE_USERS.get(uid)
+        if ws and not ws.closed:
+            await ws.send_json(payload)
 
 
 def setup_websocket_routes(app: web.Application):
