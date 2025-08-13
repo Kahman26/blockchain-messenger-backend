@@ -1,5 +1,6 @@
 from aiohttp import web, WSMsgType
 from app.database.db import engine
+from app.database.models import ChatMembers
 from app.utils.auth import get_user_from_token
 import json
 
@@ -42,6 +43,25 @@ async def websocket_handler(request):
         del connected_clients[user_id]
 
     return ws
+
+
+async def notify_chat_updated(chat_id: int, exclude_user_id: int = None):
+    """
+    Отправляет событие chat_updated всем участникам чата, кроме exclude_user_id.
+    """
+    async with engine.connect() as conn:
+        result = await conn.execute(
+            ChatMembers.select().where(ChatMembers.c.chat_id == chat_id)
+        )
+        members = result.fetchall()
+
+    for member in members:
+        uid = member.user_id
+        if uid in connected_clients and uid != exclude_user_id:
+            await connected_clients[uid].send_json({
+                "type": "chat_updated",
+                "chat_id": chat_id
+            })
 
 
 def setup_websocket_routes(app: web.Application):

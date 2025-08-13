@@ -43,6 +43,8 @@ from app.database import blockchain as db_chain
 
 from random import randint
 
+from app.routes.websocket import notify_chat_updated
+
 
 async def get_current_user_id(request: web.Request) -> int:
     token = request.headers.get("Authorization", "").split("Bearer ")[-1]
@@ -356,7 +358,6 @@ async def remove_chat_member(request: web.Request):
     return web.json_response({"message": "Пользователь удалён"})
 
 
-
 @docs(
     tags=["Messages"],
     summary="Отправка индивидуально зашифрованных сообщений участникам чата (включая себя)",
@@ -403,6 +404,8 @@ async def send_chat_message(request: web.Request):
         )
         await db_chain.store_encrypted_payload(tx_id, encrypted)
         tx_ids.append(tx_id)
+
+    await notify_chat_updated(chat_id, exclude_user_id=sender_id)
 
     return web.json_response({
         "message": f"Успешно отправлено {len(tx_ids)} сообщений",
