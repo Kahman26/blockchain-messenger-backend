@@ -37,6 +37,11 @@ def create_app() -> web.Application:
 
     setup_websocket_routes(app)
 
+    async def health(request):
+        return web.json_response({"status": "ok"})
+
+    app.router.add_get("/health", health)
+
     setup_aiohttp_apispec(
         app=app,
         title="User API",
