@@ -24,6 +24,12 @@ class Settings(BaseSettings):
     EMAIL_HOST_USER: str
     EMAIL_HOST_PASSWORD: str
 
+    S3_ENDPOINT: str = "https://storage.yandexcloud.net"
+    S3_BUCKET: str
+    S3_REGION: str = "ru-central1"
+    S3_ACCESS_KEY_ID: str
+    S3_SECRET_ACCESS_KEY: str
+
     class Config:
         env_file = str(Path(__file__).parent / ".env")
         env_file_encoding = "utf-8"

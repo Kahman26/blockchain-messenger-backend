@@ -6,6 +6,7 @@ from app.routes.auth import routes as auth_routes
 from app.routes.users import setup_user_routes
 from app.routes.chats import setup_chat_routes
 from app.routes.websocket import setup_websocket_routes
+from app.routes.s3_demo import routes as s3_demo_routes
 
 from app.config import settings
 from app.database.db import engine
@@ -30,6 +31,9 @@ def create_app() -> web.Application:
 
     for route in auth_routes:
         app.router.add_route(route.method, route.path, route.handler)
+
+    for r in s3_demo_routes:
+        app.router.add_route(r.method, r.path, r.handler)
 
     setup_user_routes(app)
 
